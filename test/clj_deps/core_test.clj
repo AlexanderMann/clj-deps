@@ -7,11 +7,10 @@
   [sym-or-syms & {:as opts}]
   (-> sym-or-syms
       (stest/check {:clojure.spec.test.check/opts opts})
-      ;stest/summarize-results
-      ;(dissoc :total)
-      ;(dissoc :check-passed)
-      ;empty?
-      ))
+      stest/summarize-results
+      (dissoc :total)
+      (dissoc :check-passed)
+      empty?))
 
 (deftest gen-testing
   (testing "project.clj based fns"
@@ -35,3 +34,7 @@
                 deps/deps->edges
                 (map (fn [edge] (map ::k edge)))
                 (into #{}))))))
+
+(deftest main
+  (testing "main works"
+    (is (not-empty (deps/main)))))
