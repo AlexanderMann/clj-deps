@@ -37,4 +37,4 @@
 
 (deftest run!
   (testing "run! works"
-    (is (not-empty (deps/run!)))))
+    (is (not-empty (deps/main)))))

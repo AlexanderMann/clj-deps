@@ -318,7 +318,7 @@
     (assoc graph-map
       org-name (build-org-wide-graph!))))
 
-(defn run!
+(defn main
   "Using env vars build graphs."
   []
   (build-graphs-for-org! (System/getenv "CLJ_DEPS__GH__TOKEN")
