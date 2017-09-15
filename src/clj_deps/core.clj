@@ -1,5 +1,6 @@
 (ns clj-deps.core
-  (:require [clojure.java.io :as io]
+  (:require [cheshire.core :as json]
+            [clojure.java.io :as io]
             [clojure.java.shell :refer [sh]]
             [clojure.spec.alpha :as s]
             [clojure.string :as string]
@@ -44,7 +45,7 @@
 
 (def tmp-dir "/code/tmp/")
 (def storage-dir "/code/storage/")
-(def clj-deps-file "clj-deps.edn")
+(def clj-deps-prefix "clj-deps")
 
 (defn cleaned-name
   [x]
@@ -70,6 +71,11 @@
                    (func func f2)))
                (io/delete-file f))]
     (func func (io/file fname))))
+
+(defn store
+  [path data]
+  (spit (str path ".edn") (pr-str data))
+  (spit (str path ".json") (json/write data)))
 
 (defn git-clone!
   "Takes a Github Oauth Token, a Repo response map, and returns
@@ -108,7 +114,7 @@
 
 (defn- clj-deps-paths
   []
-  (find-paths storage-dir clj-deps-file))
+  (find-paths storage-dir clj-deps-prefix))
 
 (s/def ::project-clj (s/with-gen (partial instance? File)
                                  (constantly
@@ -253,11 +259,11 @@
                                                    storage-dir
                                                    (cleaned-name full-name)
                                                    (cleaned-name (.getParentFile project-clj))
-                                                   clj-deps-file)]
+                                                   clj-deps-prefix)]
                                   (if (seq (::nodes graph))
                                     (do (log/info "storing " path)
                                         (io/make-parents path)
-                                        (spit path (pr-str graph))
+                                        (store path graph)
                                         path)
                                     (log/info "skipping " path)))))
                          (remove nil?)
@@ -300,10 +306,9 @@
 
 (defn build-org-wide-graph!
   []
-  (let [path (str storage-dir clj-deps-file)]
+  (let [path (str storage-dir clj-deps-prefix)]
     (io/make-parents path)
-    (spit path
-          (pr-str (build-org-wide-graph)))
+    (store path (build-org-wide-graph))
     [path]))
 
 (defn build-graphs-for-org!
