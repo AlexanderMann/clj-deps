@@ -257,7 +257,7 @@
                                   (if (seq (::nodes graph))
                                     (do (log/info "storing " path)
                                         (io/make-parents path)
-                                        (spit path graph)
+                                        (spit path (pr-str graph))
                                         path)
                                     (log/info "skipping " path)))))
                          (remove nil?)
@@ -303,7 +303,7 @@
   (let [path (str storage-dir clj-deps-file)]
     (io/make-parents path)
     (spit path
-          (build-org-wide-graph))
+          (pr-str (build-org-wide-graph)))
     [path]))
 
 (defn build-graphs-for-org!
@@ -333,24 +333,5 @@
   (build-graphs-for-org! "<redacted>"
                          "AlexanderMann")
 
-  (->> (fetch-repos "<redacted>"
-                    "BambooBuds")
-       (take 1)
-
-       ;(map (partial build-graphs! "<redacted>"))
-       )
-
-  (->> (project-clj-paths)
-       first
-       lein-deps
-       :out
-       snag
-       deps->data)
-
-  (re-find #"\s*" (last (string/split-lines snagged)))
-
-  (s/explain-data (s/coll-of ::deps-entry) (deps->data snagged))
-
-  (->> (deps->data snagged)
-       deps->edges)
-  )
+  (fetch-repos "<redacted>"
+               "BambooBuds"))
