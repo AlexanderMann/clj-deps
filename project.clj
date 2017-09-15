@@ -3,9 +3,11 @@
   :url "https://github.com/AlexanderMann/clj-deps"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
+
   :min-lein-version "2.0.0"
   :jvm-opts ["-Xmx2g"]
   :monkeypatch-clojure-test false
+
   :dependencies [[com.taoensso/timbre "4.10.0"]
                  [org.clojure/clojure "1.9.0-alpha20"]
                  [org.clojure/test.check "0.9.0"]
@@ -14,4 +16,10 @@
                  [clj-http "3.7.0"]
                  [tentacles "0.5.1"
                   :exclusions [cheshire
-                               clj-http]]])
+                               clj-http]]]
+
+  :aliases {"cci-test" ["with-profile" "dev" "run" "-m" "circleci.test/dir" :project/test-paths]}
+  :profiles {:dev {:dependencies   [[pjstadig/humane-test-output "0.8.1"]
+                                    [circleci/circleci.test "0.3.0"]]
+                   :injections     [(require 'pjstadig.humane-test-output)
+                                    (pjstadig.humane-test-output/activate!)]}})

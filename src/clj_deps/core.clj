@@ -318,6 +318,12 @@
     (assoc graph-map
       org-name (build-org-wide-graph!))))
 
+(defn run!
+  "Using env vars build graphs."
+  []
+  (build-graphs-for-org! (System/getenv "CLJ_DEPS__GH__TOKEN")
+                         (System/getenv "CLJ_DEPS__GH__ORG")))
+
 (comment
   (defn snag
     [arg]

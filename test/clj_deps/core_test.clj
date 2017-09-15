@@ -34,3 +34,7 @@
                 deps/deps->edges
                 (map (fn [edge] (map ::k edge)))
                 (into #{}))))))
+
+(deftest run!
+  (testing "run! works"
+    (is (not-empty (deps/run!)))))
