@@ -35,6 +35,6 @@
                 (map (fn [edge] (map ::k edge)))
                 (into #{}))))))
 
-(deftest run!
-  (testing "run! works"
+(deftest main
+  (testing "main works"
     (is (not-empty (deps/main)))))
