@@ -1,10 +1,11 @@
 (ns clj-deps.core
   (:require [clojure.java.io :as io]
             [clojure.java.shell :refer [sh]]
+            [clojure.spec.alpha :as s]
             [clojure.string :as string]
+            [clojure.test.check.generators :as gen]
             [taoensso.timbre :as log]
-            [tentacles.repos :as repos]
-            [clojure.spec.alpha :as s])
+            [tentacles.repos :as repos])
   (:import [java.io File]))
 
 (def tmp-dir "/code/tmp/")
@@ -17,11 +18,6 @@
       (string/replace-first tmp-dir "")
       (string/replace-first "/code/" "")
       (string/replace  "/" "_")))
-
-(defn snag
-  [arg]
-  (def snagged arg)
-  arg)
 
 (defn clone-url
   [token {:keys [clone_url] :as repo}]
@@ -55,7 +51,7 @@
              :dir tmp-dir)
     ::cleanup-fn (fn [] (delete-recursively tmp-dir))))
 
-(defn project-clj-paths
+(defn- project-clj-paths
   []
   (->> tmp-dir
        io/file
@@ -63,18 +59,29 @@
        (filter (fn [file]
                  (= "project.clj" (.getName file))))))
 
+(s/def ::project-clj (s/with-gen (partial instance? File)
+                                 (gen/elements
+                                   [(io/file "/code/project.clj")
+                                    (io/file "/code/resources/test/project.clj")])))
+
 (defn lein-deps
   [^File project-clj]
   (log/info "fetching lein deps for: " (.getAbsolutePath project-clj))
-  (snag project-clj)
   (sh "lein" "deps" ":tree"
       :dir (.getParentFile project-clj)))
+
+(s/def ::exit number?)
+(s/def ::out string?)
+(s/def ::err string?)
+(s/fdef
+  lein-deps
+  :args (s/cat :project-clj ::project-clj)
+  :ret (s/keys :req-un [::exit ::out ::err]))
 
 (defn deps->data
   "Takes a deps-tree string and turns it into usable data."
   [deps-tree]
   (->> deps-tree
-       snag
        string/split-lines
        (remove empty?)
        (map (fn [s]
@@ -155,28 +162,33 @@
                     :out
                     deps->data
                     (map #(assoc % ::project-clj project-clj))))]
-    (when deps
-      {::nodes deps
-       ::edges (deps->edges deps)})))
+    {::nodes deps
+     ::edges (deps->edges deps)}))
+
+(s/def ::nodes (s/coll-of ::node))
+(s/def ::edges (s/coll-of ::edge))
+(s/def ::graph (s/keys :req [::nodes ::edges]))
+
+(s/fdef
+  build-graph
+  :args (s/cat :project-clj ::project-clj)
+  :ret ::graph)
 
 (defn build-graphs!
   [token repo]
   (log/info "building graphs")
   (let [cleanup (::cleanup-fn (git-clone! token repo))
         path0 (format "/code/storage/%s" (cleaned-name (:full_name repo)))]
-    (log/debug "path0 is: " path0)
     (doseq [project-clj (project-clj-paths)]
       (let [graph (build-graph project-clj)
             path (format "%s/%s/clj-deps"
                          "/code/storage/circleci_circle"
                          (cleaned-name (.getParentFile project-clj)))]
-        (log/debug "path is: " path)
-        (if graph
+        (if (seq (::nodes graph))
           (do (log/info "storing " path)
               (io/make-parents path)
               (spit path graph))
           (log/info "skipping " path))))
-    (log/info "cleaning up cruft")
     (cleanup)))
 
 (defn fetch-repos
@@ -188,11 +200,16 @@
                              :full_name]))))
 
 (comment
-  (->> (fetch-repos "484be452c3ffed9bcfa7afa3c35525b4d89cb090"
+  (defn snag
+    [arg]
+    (def snagged arg)
+    arg)
+
+  (->> (fetch-repos "<redacted>"
                     "circleci")
        (take 1)
 
-       (map (partial build-graphs! "484be452c3ffed9bcfa7afa3c35525b4d89cb090")))
+       (map (partial build-graphs! "<redacted>")))
 
   (->> (project-clj-paths)
        first
