@@ -19,7 +19,8 @@
                          `deps/build-graph]
                         :num-tests 5)))
   (testing "generated data-able"
-    (is (stest-w-report `deps/deps->edges))))
+    (is (stest-w-report `deps/deps->edges
+                        :num-tests 100))))
 
 (deftest deps->edges
   (testing "basic edge test"

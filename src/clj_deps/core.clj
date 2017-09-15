@@ -108,7 +108,7 @@
 (s/def ::depth (s/or :0 zero?
                      :+ (s/with-gen pos?
                                     (constantly
-                                      (gen/choose 1 100)))))
+                                      (gen/choose 1 10)))))
 (s/def ::node (s/keys :req [::depth ::dep-name ::version ::exclusions]))
 (s/def ::deps (s/coll-of ::node))
 
@@ -131,18 +131,24 @@
      [k1 k2]
      [k0 k3]]"
   [nodes]
-  (->> nodes
-       (reduce (fn [{:keys [::accum ::lookup]} node]
-                 {::accum (if-let [parent (->> node
-                                               ::depth
-                                               dec
-                                               (get lookup))]
-                            (conj accum [parent node])
-                            accum)
-                  ::lookup (assoc lookup
-                             (::depth node) node)})
-               {::accum []})
-       ::accum))
+  (log/debugf "turning deps into edges for: %d nodes"
+              (count nodes))
+  (let [edges (->> nodes
+                   (reduce (fn [{:keys [::accum ::lookup]} node]
+                             {::accum  (if-let [parent (->> node
+                                                            ::depth
+                                                            dec
+                                                            (get lookup))]
+                                         (conj accum [parent node])
+                                         accum)
+                              ::lookup (assoc lookup
+                                         (::depth node) node)})
+                           {::accum []})
+                   ::accum)]
+    (log/debugf "turned deps into edges for: %d nodes, resulting in: %d edges"
+                (count nodes)
+                (count edges))
+    edges))
 
 (s/def ::edge (s/cat :parent ::node
                      :child ::node))
@@ -150,7 +156,13 @@
 (s/fdef
   deps->edges
   :args (s/cat :deps ::deps)
-  :ret (s/coll-of ::edge))
+  :ret (s/coll-of ::edge)
+  :fn (fn [{edges :ret}]
+        (every? (fn [{{[_ parent-depth] ::depth} :parent
+                      {[_ child-depth] ::depth} :child}]
+                  (= parent-depth
+                     (dec child-depth)))
+                edges)))
 
 (defn build-graph
   [^File project-clj]
