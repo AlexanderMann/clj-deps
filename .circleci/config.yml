@@ -12,7 +12,7 @@ workflows:
 jobs:
   build_cache:
     docker:
-      - image: clojure:alpine
+      - image: clojure:latest
     working_directory: /code/
     steps:
       - checkout
@@ -31,14 +31,14 @@ jobs:
 
   test:
     docker:
-      - image: clojure:alpine
+      - image: clojure:latest
     working_directory: /code/
     steps:
       - checkout
       - restore_cache:
           keys:
-            - deps-v0.0.0.1-{{ checksum "project.clj" }}
-            - deps-v0.0.0.1-
+            - deps-v0.0.0-{{ checksum "project.clj" }}
+
       - run:
           name: Run Tests
           command: lein cci-test
