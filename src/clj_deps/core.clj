@@ -75,7 +75,7 @@
 (defn store
   [path data]
   (spit (str path ".edn") (pr-str data))
-  (spit (str path ".json") (json/write data)))
+  (spit (str path ".json") (json/encode data)))
 
 (defn git-clone!
   "Takes a Github Oauth Token, a Repo response map, and returns
@@ -114,7 +114,7 @@
 
 (defn- clj-deps-paths
   []
-  (find-paths storage-dir clj-deps-prefix))
+  (find-paths storage-dir (str clj-deps-prefix ".edn")))
 
 (s/def ::project-clj (s/with-gen (partial instance? File)
                                  (constantly
@@ -276,6 +276,7 @@
   (log/info "Building org graph...")
   (->> (clj-deps-paths)
        (map (comp read-string slurp))
+       (remove (comp empty? ::nodes))
        (reduce (fn [{accum-nodes ::nodes accum-edges ::edges}
                     {nodes ::nodes edges ::edges}]
                  (let [root-nodes (filter (fn [node]
