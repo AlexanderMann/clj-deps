@@ -1,0 +1,13 @@
+version: '2'
+services:
+  clj-deps-repl:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      NREPL_PORT: '3141'
+    ports:
+      - '3141:3141'
+    volumes:
+      - ~/.m2:/root/.m2
+      - .:/code
