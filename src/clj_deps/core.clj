@@ -60,9 +60,10 @@
                  (= "project.clj" (.getName file))))))
 
 (s/def ::project-clj (s/with-gen (partial instance? File)
-                                 (gen/elements
-                                   [(io/file "/code/project.clj")
-                                    (io/file "/code/resources/test/project.clj")])))
+                                 (constantly
+                                   (gen/elements
+                                     [(io/file "/code/project.clj")
+                                      (io/file "/code/resources/test/project.clj")]))))
 
 (defn lein-deps
   [^File project-clj]
@@ -78,7 +79,7 @@
   :args (s/cat :project-clj ::project-clj)
   :ret (s/keys :req-un [::exit ::out ::err]))
 
-(defn deps->data
+(defn- deps->data
   "Takes a deps-tree string and turns it into usable data."
   [deps-tree]
   (->> deps-tree
@@ -89,19 +90,25 @@
                    count
                    dec
                    (/ 2))
-               (read-string s)]))
+               (try
+                 (read-string s)
+                 (catch Exception e
+                   nil))]))
        (map (fn [[depth [dep-name version _ exclusions]]]
               {::depth      depth
                ::dep-name   dep-name
                ::version    version
-               ::exclusions (flatten exclusions)}))))
+               ::exclusions (flatten exclusions)}))
+       (filter ::dep-name)))
 
 (s/def ::exclusions (s/or :nil nil?
                           :v (s/coll-of symbol?)))
 (s/def ::version string?)
 (s/def ::dep-name symbol?)
 (s/def ::depth (s/or :0 zero?
-                     :+ pos?))
+                     :+ (s/with-gen pos?
+                                    (constantly
+                                      (gen/choose 1 100)))))
 (s/def ::node (s/keys :req [::depth ::dep-name ::version ::exclusions]))
 (s/def ::deps (s/coll-of ::node))
 
@@ -123,27 +130,19 @@
     [[k0 k1]
      [k1 k2]
      [k0 k3]]"
-  [[{age ::depth :as ancestor} & family]]
-  (let [younger? (fn [member]
-                   (< age
-                      (::depth member)))
-        child? (fn [descendant]
-                 (= age
-                    (dec (::depth descendant))))]
-    (concat (->> (take-while younger? family)
-                 (filter child?)
-                 (map (partial vector ancestor)))
-            (when family
-              (deps->edges family)))))
-
-(comment
-  (->> [{::depth 0 ::k 0}
-        {::depth 1 ::k 1}
-        {::depth 2 ::k 2}
-        {::depth 1 ::k 3}
-        {::depth 0 ::k 4}]
-       deps->edges
-       (map (fn [edge] (map ::k edge)))))
+  [nodes]
+  (->> nodes
+       (reduce (fn [{:keys [::accum ::lookup]} node]
+                 {::accum (if-let [parent (->> node
+                                               ::depth
+                                               dec
+                                               (get lookup))]
+                            (conj accum [parent node])
+                            accum)
+                  ::lookup (assoc lookup
+                             (::depth node) node)})
+               {::accum []})
+       ::accum))
 
 (s/def ::edge (s/cat :parent ::node
                      :child ::node))
@@ -162,7 +161,7 @@
                     :out
                     deps->data
                     (map #(assoc % ::project-clj project-clj))))]
-    {::nodes deps
+    {::nodes (or deps [])
      ::edges (deps->edges deps)}))
 
 (s/def ::nodes (s/coll-of ::node))
