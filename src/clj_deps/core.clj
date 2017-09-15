@@ -8,7 +8,43 @@
             [tentacles.repos :as repos])
   (:import [java.io File]))
 
+(defn fetch-repos
+  "Given a token and a target org name, fetch basic information about all repos
+  present in github. See specs for more details.
+
+  NOTE: if no org is able to be found, this will try to pull a user's repos.
+  This is because Github's users are orgs but their orgs aren't users and
+  if you think this docstring just got hella confusing you are not alone..."
+  [token org-name]
+  (let [auth {:oauth-token token
+              :all-pages   true}
+        not-found->empty (fn [repos?]
+                           (if (and (map? repos?)
+                                    (-> repos?
+                                        :status
+                                        (= 404)))
+                             []
+                             repos?))
+        org-repos (not-found->empty (tentacles.repos/org-repos org-name auth))
+        user-repos (not-found->empty (tentacles.repos/user-repos org-name auth))]
+    (map #(select-keys % [:clone_url
+                          :full_name
+                          :html_url])
+         (concat org-repos user-repos))))
+
+(s/def ::clone_url string?)
+(s/def ::full_name string?)
+(s/def ::html_url string?)
+(s/def ::repo (s/keys :req-un [::clone_url ::full_name ::html_url]))
+
+(s/fdef
+  fetch-repos
+  :args (s/cat :token string? :org-name string?)
+  :ret (s/coll-of ::repo))
+
 (def tmp-dir "/code/tmp/")
+(def storage-dir "/code/storage/")
+(def clj-deps-file "clj-deps.edn")
 
 (defn cleaned-name
   [x]
@@ -17,7 +53,7 @@
         x)
       (string/replace-first tmp-dir "")
       (string/replace-first "/code/" "")
-      (string/replace  "/" "_")))
+      (string/replace "/" "_")))
 
 (defn clone-url
   [token {:keys [clone_url] :as repo}]
@@ -51,13 +87,28 @@
              :dir tmp-dir)
     ::cleanup-fn (fn [] (delete-recursively tmp-dir))))
 
+(defn- find-paths
+  [root target]
+  (let [paths (->> root
+                   io/file
+                   file-seq
+                   (filter (fn [file]
+                             (and (not (.isDirectory file))
+                                  (= target (.getName file))))))]
+    (log/infof "found paths for %s*%s:\n%s"
+               root
+               target
+               (pr-str (mapv (fn [file] (.getAbsolutePath file))
+                             paths)))
+    paths))
+
 (defn- project-clj-paths
   []
-  (->> tmp-dir
-       io/file
-       file-seq
-       (filter (fn [file]
-                 (= "project.clj" (.getName file))))))
+  (find-paths tmp-dir "project.clj"))
+
+(defn- clj-deps-paths
+  []
+  (find-paths storage-dir clj-deps-file))
 
 (s/def ::project-clj (s/with-gen (partial instance? File)
                                  (constantly
@@ -159,22 +210,26 @@
   :ret (s/coll-of ::edge)
   :fn (fn [{edges :ret}]
         (every? (fn [{{[_ parent-depth] ::depth} :parent
-                      {[_ child-depth] ::depth} :child}]
+                      {[_ child-depth] ::depth}  :child}]
                   (= parent-depth
                      (dec child-depth)))
                 edges)))
 
 (defn build-graph
-  [^File project-clj]
+  [^File project-clj labels]
   (log/info "building graph for: " (.getAbsolutePath project-clj))
   (let [result (lein-deps project-clj)
         deps (when (zero? (:exit result))
                (->> result
                     :out
                     deps->data
-                    (map #(assoc % ::project-clj project-clj))))]
-    {::nodes (or deps [])
-     ::edges (deps->edges deps)}))
+                    (map #(merge %
+                                 {:project-clj (.getAbsolutePath project-clj)}
+                                 labels))))]
+    {::nodes (into #{} deps)
+     ::edges (->> deps
+                  deps->edges
+                  (into #{}))}))
 
 (s/def ::nodes (s/coll-of ::node))
 (s/def ::edges (s/coll-of ::edge))
@@ -182,33 +237,86 @@
 
 (s/fdef
   build-graph
-  :args (s/cat :project-clj ::project-clj)
+  :args (s/cat :project-clj ::project-clj
+               :labels (s/keys :opt-un []))
   :ret ::graph)
 
 (defn build-graphs!
-  [token repo]
-  (log/info "building graphs")
+  [token {full-name :full_name :as repo}]
+  (log/info "building graphs for: " full-name)
   (let [cleanup (::cleanup-fn (git-clone! token repo))
-        path0 (format "/code/storage/%s" (cleaned-name (:full_name repo)))]
-    (doseq [project-clj (project-clj-paths)]
-      (let [graph (build-graph project-clj)
-            path (format "%s/%s/clj-deps"
-                         "/code/storage/circleci_circle"
-                         (cleaned-name (.getParentFile project-clj)))]
-        (if (seq (::nodes graph))
-          (do (log/info "storing " path)
-              (io/make-parents path)
-              (spit path graph))
-          (log/info "skipping " path))))
-    (cleanup)))
+        graph-paths (->> (project-clj-paths)
+                         (map (fn [project-clj]
+                                (let [graph (build-graph project-clj (select-keys repo [:full_name
+                                                                                        :html_url]))
+                                      path (format "%s%s/%s/%s"
+                                                   storage-dir
+                                                   (cleaned-name full-name)
+                                                   (cleaned-name (.getParentFile project-clj))
+                                                   clj-deps-file)]
+                                  (if (seq (::nodes graph))
+                                    (do (log/info "storing " path)
+                                        (io/make-parents path)
+                                        (spit path graph)
+                                        path)
+                                    (log/info "skipping " path)))))
+                         (remove nil?)
+                         doall)]
+    (cleanup)
+    graph-paths))
 
-(defn fetch-repos
+(defn build-org-wide-graph
+  []
+  (log/info "Building org graph...")
+  (->> (clj-deps-paths)
+       (map (comp read-string slurp))
+       (reduce (fn [{accum-nodes ::nodes accum-edges ::edges}
+                    {nodes ::nodes edges ::edges}]
+                 (let [root-nodes (filter (fn [node]
+                                            (zero? (::depth node)))
+                                          nodes)
+                       {repo-name :full_name
+                        repo-url :html_url} (first root-nodes)
+                       repo-node {::depth -1
+                                  ::dep-name (symbol repo-name)
+                                  ::exclusions nil
+                                  :full_name repo-name
+                                  :html_url repo-url
+                                  ::version (.toGMTString (java.util.Date.))}
+                       repo-edges (map (partial vector repo-node)
+                                       root-nodes)
+                       inc-node-depth (fn [node]
+                                        (update node ::depth inc))
+                       inc-edge-depths (fn [edge]
+                                         (mapv inc-node-depth edge))]
+                   {::nodes (->> (concat accum-nodes nodes [repo-node])
+                                 (mapv inc-node-depth)
+                                 (into #{}))
+                    ::edges (->> (concat accum-edges edges repo-edges)
+                                 (mapv inc-edge-depths)
+                                 (into #{}))}))
+               {::nodes #{}
+                ::edges #{}})))
+
+(defn build-org-wide-graph!
+  []
+  (let [path (str storage-dir clj-deps-file)]
+    (io/make-parents path)
+    (spit path
+          (build-org-wide-graph))
+    [path]))
+
+(defn build-graphs-for-org!
   [token org-name]
-  (->> {:oauth-token token
-        :all-pages   true}
-       (tentacles.repos/org-repos org-name)
-       (map #(select-keys % [:clone_url
-                             :full_name]))))
+  (let [repos (fetch-repos token org-name)
+        _ (log/info "Repos to build graphs for:\n" (mapv :full_name repos))
+        graph-map (->> repos
+                       (map (fn [repo]
+                              [repo (seq (build-graphs! token repo))]))
+                       (filter second)
+                       (into {}))]
+    (assoc graph-map
+      org-name (build-org-wide-graph!))))
 
 (comment
   (defn snag
@@ -216,11 +324,15 @@
     (def snagged arg)
     arg)
 
+  (build-graphs-for-org! "<redacted>"
+                         "AlexanderMann")
+
   (->> (fetch-repos "<redacted>"
-                    "circleci")
+                    "BambooBuds")
        (take 1)
 
-       (map (partial build-graphs! "<redacted>")))
+       ;(map (partial build-graphs! "<redacted>"))
+       )
 
   (->> (project-clj-paths)
        first
