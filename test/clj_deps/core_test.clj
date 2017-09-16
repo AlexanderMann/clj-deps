@@ -6,12 +6,9 @@
 
 (deftest gen-testing
   (testing "project.clj based fns"
-    (is (tu/stest-w-report [`deps/lein-deps
-                         `deps/build-graph]
-                        :num-tests 5)))
-  (testing "generated data-able"
-    (is (tu/stest-w-report `deps/deps->edges
-                        :num-tests 100))))
+    (is (tu/stest-w-report [`deps/build-repo-graph
+                            `deps/build-org-graph]
+                           :num-tests 5))))
 
 (deftest main
   (testing "main works"

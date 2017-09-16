@@ -1,6 +1,7 @@
 (ns clj-deps.filesystem
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
+            [clojure.java.shell :refer [sh]]
             [clojure.spec.alpha :as s]
             [taoensso.timbre :as log])
   (:import [java.io File]))
@@ -10,13 +11,13 @@
 
 (defn delete-recursively
   [path]
-  (log/warn "deleting recursively: " path)
-  (let [func (fn [func ^File f]
-               (when (.isDirectory f)
-                 (doseq [f2 (.listFiles f)]
-                   (func func f2)))
-               (io/delete-file f))]
-    (func func (io/file path))))
+  (log/warn "deleting:" path)
+  (let [f (io/file path)]
+    (when (.exists f)
+      (sh "rm" "-rf"
+          (if (.isDirectory f)
+            (.getAbsolutePath f)
+            (.getAbsolutePath (.getParentFile f)))))))
 
 (defn store
   "Given a path, prefix with the storage-dir, save an edn version,

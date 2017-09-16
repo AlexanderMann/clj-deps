@@ -1,15 +1,15 @@
 (ns clj-deps.core
   (:require [cheshire.core :as json]
-            [clojure.java.io :as io]
+            [clj-deps.filesystem :as fs]
             [clj-deps.github :as github]
+            [clj-deps.graph :as graph]
+            [clj-deps.lein :as lein]
+            [clojure.java.io :as io]
             [clojure.java.shell :refer [sh]]
             [clojure.spec.alpha :as s]
             [clojure.string :as string]
             [clojure.test.check.generators :as gen]
-            [taoensso.timbre :as log]
-            [clj-deps.lein :as lein]
-            [clj-deps.filesystem :as fs]
-            [clj-deps.graph :as graph])
+            [taoensso.timbre :as log])
   (:import [java.io File]
            [java.util Date]))
 
@@ -23,13 +23,13 @@
       (string/replace "/" "__")
       (string/replace "." "_")))
 
-(defn repo-node
+(defn- repo-node
   [{link ::github/link} children]
   {:id       [link]
    :type     :repo
    :children (into #{} children)})
 
-(defn org-node
+(defn- org-node
   [org-name children]
   {:id       [org-name]
    :type     :org

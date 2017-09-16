@@ -54,10 +54,10 @@
   :ret (s/coll-of ::repo))
 
 (defn- clone-url
-  [token {:keys [clone_url] :as repo}]
+  [token {clone-url ::clone-url}]
   ;; https://<token>:x-oauth-basic@github.com/owner/repo.git
   (string/replace
-    clone_url #"//" (str "//" token ":x-oauth-basic@")))
+    clone-url #"//" (str "//" token ":x-oauth-basic@")))
 
 (defn github-clone!
   "Takes a Github Oauth Token, a Repo response map, and returns
@@ -69,7 +69,7 @@
   The value there is a function which can be called to cleanup
   all actions made by this fn."
   [token repo]
-  (log/info "cloning: " (:full_name repo))
+  (log/info "cloning: " (::repo-name repo))
   (fs/delete-recursively tmp-dir)
   (io/make-parents (str tmp-dir ".clj-deps"))
   (let [result (assoc (sh "git" "clone" (clone-url token repo)
