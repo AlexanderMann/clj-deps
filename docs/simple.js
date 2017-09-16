@@ -1,165 +1,185 @@
-var treeData = [
-    {
-        "name": "Top Level",
-        "parent": "null",
-        "children": [
-            {
-                "name": "Level 2: A",
-                "parent": "Top Level",
-                "children": [
-                    {
-                        "name": "Son of A",
-                        "parent": "Level 2: A"
-                    },
-                    {
-                        "name": "Daughter of A",
-                        "parent": "Level 2: A"
-                    }
-                ]
-            },
-            {
-                "name": "Level 2: B",
-                "parent": "Top Level"
-            }
+d3.json("examples/dev/clj-deps.json", function(data) {
+    let names = data.nodes.map(node => {return node.name})
+    // data.nodes = data.nodes.map(node => {return {name: node.name + " " + node.version}})
+    data.nodes = data.nodes.map(node => {return {name: node.name}})
+    data.edges =  data.edges.map(node => {
+        if (names.indexOf(node[0].name) === -1 || names.indexOf(node[1].name) === -1) {
+            console.log("nodeee", node)
+            return "whoops"
+        } else {
+            return {source: names.indexOf(node[0].name), target: names.indexOf(node[1].name)}
+        }
+    }).filter(node => {return node != "whoops"})
+
+    // console.log(Object.values(data.edges))
+
+    console.log(Object.values(data.nodes))
+    console.log(Object.values(data.edges))
+
+    // console.log("nodes:", ns)
+    // console.log("edges", es)
+    var w = 1000;
+    var h = 600;
+    var linkDistance=200;
+
+    var colors = d3.scale.category10();
+
+    let dataset = {
+
+        nodes: [
+            {name: "Adam"},
+            {name: "Bob"},
+            {name: "Carrie"},
+            {name: "Donovan"},
+            {name: "Edward"},
+            {name: "Felicity"},
+            {name: "George"},
+            {name: "Hannah"},
+            {name: "Iris"},
+            {name: "Jerry"}
+        ],
+        edges: [
+            {source: 0, target: 1},
+            {source: 0, target: 2},
+            {source: 0, target: 3},
+            {source: 0, target: 4},
+            {source: 1, target: 5},
+            {source: 2, target: 5},
+            {source: 2, target: 5},
+            {source: 3, target: 4},
+            {source: 5, target: 8},
+            {source: 5, target: 9},
+            {source: 6, target: 7},
+            {source: 7, target: 8},
+            {source: 8, target: 9}
         ]
-    }
-];
+    };
 
-// ************** Generate the tree diagram	 *****************
-var margin = {top: 20, right: 120, bottom: 20, left: 120},
-    width = 960 - margin.right - margin.left,
-    height = 500 - margin.top - margin.bottom;
+    var svg = d3.select("body").append("svg").attr({"width":w,"height":h});
 
-var i = 0,
-    duration = 750,
-    root;
+    console.log(
+Object.values(dataset.edges),
+Object.values(data.edges)
+    )
 
-var tree = d3.layout.tree()
-    .size([height, width]);
-
-var diagonal = d3.svg.diagonal()
-    .projection(function(d) { return [d.y, d.x]; });
-
-var svg = d3.select("body").append("svg")
-    .attr("width", width + margin.right + margin.left)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-root = treeData[0];
-root.x0 = height / 2;
-root.y0 = 0;
-
-update(root);
-
-
-d3.json("simple-clj-deps.json", function(data) {
-    console.log(data)
-    root  = data[0]
-    update(root);
-});
+    var force = d3.layout.force()
+        .nodes(data.nodes)
+    // This should be data.edges but that gives an error event thought dataset.edges & data.edges
+    // have the same shape of data?????
+        .links(dataset.edges)
+        .size([w,h])
+        .linkDistance([linkDistance])
+        .charge([-500])
+        .theta(0.1)
+        .gravity(0.05)
+        .start();
 
 
 
-d3.select(self.frameElement).style("height", "500px");
+    var edges = svg.selectAll("line")
+        .data(dataset.edges)
+        .enter()
+        .append("line")
+        .attr("id",function(d,i) {return 'edge'+i})
+        .attr('marker-end','url(#arrowhead)')
+        .style("stroke","#ccc")
+        .style("pointer-events", "none");
 
-function update(source) {
+    var nodes = svg.selectAll("circle")
+        .data(dataset.nodes)
+        .enter()
+        .append("circle")
+        .attr({"r":15})
+        .style("fill",function(d,i){return colors(i);})
+        .call(force.drag)
 
-    // Compute the new tree layout.
-    var nodes = tree.nodes(root).reverse(),
-        links = tree.links(nodes);
 
-    // Normalize for fixed-depth.
-    nodes.forEach(function(d) { d.y = d.depth * 180; });
+    var nodelabels = svg.selectAll(".nodelabel")
+        .data(dataset.nodes)
+        .enter()
+        .append("text")
+        .attr({"x":function(d){return d.x;},
+            "y":function(d){return d.y;},
+            "class":"nodelabel",
+            "stroke":"black"})
+        .text(function(d){return d.name + d.version;});
 
-    // Update the nodes…
-    var node = svg.selectAll("g.node")
-        .data(nodes, function(d) { return d.id || (d.id = ++i); });
+    var edgepaths = svg.selectAll(".edgepath")
+        .data(dataset.edges)
+        .enter()
+        .append('path')
+        .attr({'d': function(d) {return 'M '+d.source.x+' '+d.source.y+' L '+ d.target.x +' '+d.target.y},
+            'class':'edgepath',
+            'fill-opacity':0,
+            'stroke-opacity':0,
+            'fill':'blue',
+            'stroke':'red',
+            'id':function(d,i) {return 'edgepath'+i}})
+        .style("pointer-events", "none");
 
-    // Enter any new nodes at the parent's previous position.
-    var nodeEnter = node.enter().append("g")
-        .attr("class", "node")
-        .attr("transform", function(d) { return "translate(" + source.y0 + "," + source.x0 + ")"; })
-        .on("click", click);
+    var edgelabels = svg.selectAll(".edgelabel")
+        .data(dataset.edges)
+        .enter()
+        .append('text')
+        .style("pointer-events", "none")
+        .attr({'class':'edgelabel',
+            'id':function(d,i){return 'edgelabel'+i},
+            'dx':80,
+            'dy':0,
+            'font-size':10,
+            'fill':'#aaa'});
 
-    nodeEnter.append("circle")
-        .attr("r", 1e-6)
-        .style("fill", function(d) { return d._children ? "lightsteelblue" : "#fff"; });
+    edgelabels.append('textPath')
+        .attr('xlink:href',function(d,i) {return '#edgepath'+i})
+        .style("pointer-events", "none")
+        .text(function(d,i){return 'label '+i});
 
-    nodeEnter.append("text")
-        .attr("x", function(d) { return d.children || d._children ? -13 : 13; })
-        .attr("dy", ".35em")
-        .attr("text-anchor", function(d) { return d.children || d._children ? "end" : "start"; })
-        .text(function(d) { return d.name; })
-        .style("fill-opacity", 1e-6);
 
-    // Transition nodes to their new position.
-    var nodeUpdate = node.transition()
-        .duration(duration)
-        .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; });
+    svg.append('defs').append('marker')
+        .attr({'id':'arrowhead',
+            'viewBox':'-0 -5 10 10',
+            'refX':25,
+            'refY':0,
+            //'markerUnits':'strokeWidth',
+            'orient':'auto',
+            'markerWidth':10,
+            'markerHeight':10,
+            'xoverflow':'visible'})
+        .append('svg:path')
+        .attr('d', 'M 0,-5 L 10 ,0 L 0,5')
+        .attr('fill', '#ccc')
+        .attr('stroke','#ccc');
 
-    nodeUpdate.select("circle")
-        .attr("r", 10)
-        .style("fill", function(d) { return d._children ? "lightsteelblue" : "#fff"; });
 
-    nodeUpdate.select("text")
-        .style("fill-opacity", 1);
+    force.on("tick", function(){
 
-    // Transition exiting nodes to the parent's new position.
-    var nodeExit = node.exit().transition()
-        .duration(duration)
-        .attr("transform", function(d) { return "translate(" + source.y + "," + source.x + ")"; })
-        .remove();
-
-    nodeExit.select("circle")
-        .attr("r", 1e-6);
-
-    nodeExit.select("text")
-        .style("fill-opacity", 1e-6);
-
-    // Update the links…
-    var link = svg.selectAll("path.link")
-        .data(links, function(d) { return d.target.id; });
-
-    // Enter any new links at the parent's previous position.
-    link.enter().insert("path", "g")
-        .attr("class", "link")
-        .attr("d", function(d) {
-            var o = {x: source.x0, y: source.y0};
-            return diagonal({source: o, target: o});
+        edges.attr({"x1": function(d){return d.source.x;},
+            "y1": function(d){return d.source.y;},
+            "x2": function(d){return d.target.x;},
+            "y2": function(d){return d.target.y;}
         });
 
-    // Transition links to their new position.
-    link.transition()
-        .duration(duration)
-        .attr("d", diagonal);
+        nodes.attr({"cx":function(d){return d.x;},
+            "cy":function(d){return d.y;}
+        });
 
-    // Transition exiting nodes to the parent's new position.
-    link.exit().transition()
-        .duration(duration)
-        .attr("d", function(d) {
-            var o = {x: source.x, y: source.y};
-            return diagonal({source: o, target: o});
-        })
-        .remove();
+        nodelabels.attr("x", function(d) { return d.x; })
+            .attr("y", function(d) { return d.y; });
 
-    // Stash the old positions for transition.
-    nodes.forEach(function(d) {
-        d.x0 = d.x;
-        d.y0 = d.y;
+        edgepaths.attr('d', function(d) { var path='M '+d.source.x+' '+d.source.y+' L '+ d.target.x +' '+d.target.y;
+            //console.log(d)
+            return path});
+
+        edgelabels.attr('transform',function(d,i){
+            if (d.target.x<d.source.x){
+                bbox = this.getBBox();
+                rx = bbox.x+bbox.width/2;
+                ry = bbox.y+bbox.height/2;
+                return 'rotate(180 '+rx+' '+ry+')';
+            }
+            else {
+                return 'rotate(0)';
+            }
+        });
     });
-}
-
-// Toggle children on click.
-function click(d) {
-    if (d.children) {
-        d._children = d.children;
-        d.children = null;
-    } else {
-        d.children = d._children;
-        d._children = null;
-    }
-    update(d);
-}
-
-
+});
