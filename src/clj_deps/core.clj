@@ -89,7 +89,8 @@
                          (graph/merge-nodes
                            (concat accum-nodes
                                    nodes
-                                   (org-node org-name #{root}))))))})
+                                   (org-node org-name #{root}))))
+                       #{}))})
 
 (s/fdef
   build-org-graph

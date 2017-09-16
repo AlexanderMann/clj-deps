@@ -69,9 +69,10 @@
   The value there is a function which can be called to cleanup
   all actions made by this fn."
   [token repo]
-  (log/info "cloning: " (::repo-name repo))
+  (log/info "prepping cloning:" (::repo-name repo))
   (fs/delete-recursively tmp-dir)
   (io/make-parents (str tmp-dir ".clj-deps"))
+  (log/info "cloning:" (::repo-name repo))
   (let [result (assoc (sh "git" "clone" (clone-url token repo)
                           :dir tmp-dir)
                  ::dir tmp-dir)]
