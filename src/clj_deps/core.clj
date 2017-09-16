@@ -36,14 +36,12 @@
    :children (into #{} children)})
 
 (defn build-repo-graph
-  [{repo-name ::github/repo-name
-    :as       repo}
-   ^File project-clj]
-  (let [graph (lein/nodes project-clj)
+  [repo ^File project-clj]
+  (let [graph (lein/graph project-clj)
         repo-graph {:desc  (pr-str {:project-desc (:desc graph)
                                     :repo         repo})
                     :root  (repo-node repo nil)
-                    :at (Date.)
+                    :at    (Date.)
                     :nodes (conj (:nodes graph)
                                  (repo-node repo
                                             #{(get-in graph [:root :id])}))}]
@@ -63,7 +61,7 @@
        ::github/dir
        lein/project-clj-paths
        (map (fn [project-clj]
-              (if-let [repo-graph (build-repo-graph repo project-clj)]
+              (if-let [repo-graph (build-repo-graph {} project-clj)]
                 (fs/store (format "%s/%s/"
                                   (cleaned-name repo-name)
                                   (cleaned-name (.getParentFile project-clj)))
@@ -79,7 +77,7 @@
                    :run-at       (.toGMTString (Date.))
                    :built-from-n (count (fs/clj-deps-paths))})
    :root  (org-node org-name nil)
-   :at (Date.)
+   :at    (Date.)
    :nodes (->> (fs/clj-deps-paths)
                (map (comp read-string slurp))
                (remove (comp empty? :nodes))
@@ -89,7 +87,7 @@
                          (graph/merge-nodes
                            (concat accum-nodes
                                    nodes
-                                   (org-node org-name #{root}))))
+                                   #{(org-node org-name #{root})})))
                        #{}))})
 
 (s/fdef
@@ -99,7 +97,7 @@
 
 (defn build-org-graph!
   [org-name]
-  (fs/store "/" (build-org-graph org-name)))
+  (fs/store "" (build-org-graph org-name)))
 
 (defn main
   "Using env vars build graphs."

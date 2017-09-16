@@ -46,8 +46,10 @@
   "Given a seq of nodes, merge them based on :id and :type."
   [nodes]
   (->> nodes
-       (reduce (fn [accum {:keys [id type children]}]
-                 (update-in accum [[id type] :children] into children))
+       (reduce (fn [accum {id :id
+                           node-type :type
+                           children :children}]
+                 (update-in accum [[id node-type] :children] into children))
                (->> nodes
                     (map (fn [dep]
                            [[(:id dep) (:type dep)] dep]))
