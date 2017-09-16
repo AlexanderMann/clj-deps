@@ -197,7 +197,8 @@
    :root {:id (->id project-clj)
           :type :project
           :children #{}}
-   :nodes (nodes project-clj)})
+   :nodes (nodes project-clj)
+   :at (Date.)})
 
 (s/fdef
   graph

@@ -43,6 +43,7 @@
         repo-graph {:desc  (pr-str {:project-desc (:desc graph)
                                     :repo         repo})
                     :root  (repo-node repo nil)
+                    :at (Date.)
                     :nodes (conj (:nodes graph)
                                  (repo-node repo
                                             #{(get-in graph [:root :id])}))}]
@@ -78,6 +79,7 @@
                    :run-at       (.toGMTString (Date.))
                    :built-from-n (count (fs/clj-deps-paths))})
    :root  (org-node org-name nil)
+   :at (Date.)
    :nodes (->> (fs/clj-deps-paths)
                (map (comp read-string slurp))
                (remove (comp empty? :nodes))

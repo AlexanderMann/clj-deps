@@ -18,8 +18,9 @@
 (s/def ::node (s/keys :req-un [::id ::children ::type]))
 (s/def ::nodes (s/coll-of ::node))
 (s/def ::desc string?)
+(s/def ::at inst?)
 (s/def ::root ::node)
-(s/def ::graph (s/keys :req-un [::desc ::root ::nodes]))
+(s/def ::graph (s/keys :req-un [::desc ::root ::nodes ::at]))
 
 (defn nodes->map
   "Take nodes and turn them into a map of :id -> node"
