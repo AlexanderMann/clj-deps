@@ -2,32 +2,80 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.test.check.generators :as gen]))
 
-(s/def ::id (s/with-gen (s/every string? :kind vector?)
-                        #(gen/vector gen/string 1 3)))
+;;; SPEC CHECKS
 
 ;; Nodes references each other as follows:
 ;; org -> repo -> project -> version -> version ...
+(def type-map {:org     :repo
+               :repo    :project
+               :project :version
+               :version :version})
 
-(def types #{:org
-             :repo
-             :project
-             :version})
-(s/def ::type (s/with-gen types
-                          #(gen/elements types)))
+(defn- child-types
+  [children]
+  (->> children
+       (map :type)
+       (into #{})))
+
+(defn- types-const?
+  [children]
+  (->> children
+       child-types
+       count
+       (>= 1)))
+
+(defn- child-types-conform?
+  [{{node-type :type} :uid children :children}]
+  (let [child-types (child-types children)]
+    (or (empty? child-types)
+        (= #{(get type-map node-type)}))))
+
+;;; GEN HELPERS
+
+(def children-gen
+  #(gen/let [t (s/gen (s/spec ::type))
+             ids (gen/set (s/gen (s/spec ::id)))]
+            (gen/return
+              (->> ids
+                   (map (fn [id] {:id id :type t}))
+                   (into #{})))))
+(def node-gen
+  #(gen/let [uid (s/gen (s/spec ::uid))
+             ids (gen/set (s/gen (s/spec ::id)))]
+            (gen/return
+              (let [t (get type-map (:type uid))]
+                (def args [uid ids t])
+                {:uid      uid
+                 :children (->> ids
+                                (map (fn [id] {:id id :type t}))
+                                (into #{}))}))))
+
+;;; SPECS
+
+(s/def ::id (-> (s/every string? :kind vector?)
+                (s/with-gen #(gen/vector gen/string 1 3))))
+(s/def ::type (-> type-map
+                  (s/with-gen #(gen/elements (keys type-map)))))
 (s/def ::uid (s/keys :req-un [::id ::type]))
-(s/def ::children (s/coll-of ::uid))
-(s/def ::node (s/keys :req-un [::uid ::children]))
+(s/def ::children (-> (s/and (s/coll-of ::uid)
+                             types-const?)
+                      (s/with-gen children-gen)))
+(s/def ::node (-> (s/and (s/keys :req-un [::uid ::children])
+                         child-types-conform?)
+                  (s/with-gen node-gen)))
 (s/def ::nodes (s/coll-of ::node))
 (s/def ::desc string?)
 (s/def ::at inst?)
 (s/def ::root ::uid)
 (s/def ::graph (s/keys :req-un [::desc ::root ::nodes ::at]))
 
+;;; FNS
+
 (defn nodes->map
   "Take nodes and turn them into a map of :uid -> node, merging
   dupilcates' children along the way"
   [nodes]
-  (reduce (fn [accum {uid :uid
+  (reduce (fn [accum {uid      :uid
                       children :children}]
             (update-in accum [uid :children] into children))
           (->> nodes
@@ -61,7 +109,7 @@
   :args (s/cat :nodes ::nodes)
   :ret ::nodes
   :fn (fn [{{nodes :nodes} :args
-            ret-nodes :ret}]
+            ret-nodes      :ret}]
         (= (->> nodes
                 (map :uid)
                 (into #{}))

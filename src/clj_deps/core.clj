@@ -75,7 +75,7 @@
   (log/info "Building org graph...")
   {:desc  (pr-str {:org          org-name
                    :built-from-n (count (fs/clj-deps-paths))})
-   :root  (org-node org-name nil)
+   :root  (:uid (org-node org-name nil))
    :at    (Date.)
    :nodes (->> (fs/clj-deps-paths)
                (map (comp read-string slurp))

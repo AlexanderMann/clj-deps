@@ -191,24 +191,23 @@
 (s/fdef
   nodes
   :args (s/cat :project-clj ::project-clj)
-  :ret (s/coll-of ::graph/node)
-  :fn (fn [{ret-nodes :ret}]
+  :ret ::graph/nodes
+  :fn (fn [{ret-nodes :ret :as args}]
         (set/subset? (->> ret-nodes
-                          (map :uid)
+                          (map :children)
+                          (apply concat)
                           (into #{}))
                      (->> ret-nodes
-                          (map :children)
-                          flatten
+                          (map :uid)
                           (into #{})))))
 
 (defn graph
   [^File project-clj]
   {:desc  (pr-str {:file-path (.getAbsolutePath project-clj)
                    :sha       (github/git-sha project-clj)})
-   :root  {:uid      (-> project-clj
-                         ->version-uid
-                         ->project-uid)
-           :children #{}}
+   :root  (-> project-clj
+              ->version-uid
+              ->project-uid)
    :nodes (nodes project-clj)
    :at    (Date.)})
 
