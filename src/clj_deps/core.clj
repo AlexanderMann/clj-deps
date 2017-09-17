@@ -24,7 +24,7 @@
       (string/replace "." "_")))
 
 (defn- repo-node
-  [{link ::github/link} children]
+  [{link :html_url} children]
   {:uid      {:id   [link]
               :type :repo}
    :children (into #{} children)})
@@ -55,7 +55,7 @@
              :graph ::graph/graph))
 
 (defn build-repo-graphs!
-  [token {repo-name ::github/repo-name :as repo}]
+  [token {repo-name :full_name :as repo}]
   (log/info "building graphs for: " repo-name)
   (->> (github/github-clone! token repo)
        ::github/dir
@@ -106,7 +106,7 @@
   ([token org-name]
    (log/info "Building graphs for:" org-name)
    (let [repos (github/fetch-repos token org-name)
-         _ (log/info "Repos to build graphs for:\n" (mapv ::github/repo-name repos))
+         _ (log/info "Repos to build graphs for:\n" (mapv :full_name repos))
          graph-map (->> repos
                         (map (fn [repo]
                                [repo (seq (build-repo-graphs! token repo))]))

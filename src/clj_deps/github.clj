@@ -16,10 +16,10 @@
                            #(gen/return (or (System/getenv "CLJ_DEPS__GH__TOKEN")
                                             ""))))
 
-(s/def ::clone-url :clj-deps.spec/url)
-(s/def ::repo-name string?)
-(s/def ::link string?)
-(s/def ::repo (s/keys :req-un [::clone-url ::repo-name ::link]))
+(s/def ::clone_url :clj-deps.spec/url)
+(s/def ::full_name string?)
+(s/def ::html_url :clj-deps.spec/url)
+(s/def ::repo (s/keys :req-un [::clone_url ::full_name ::html_url]))
 
 (defn fetch-repos
   "Given a token and a target org name, fetch basic information about all repos
@@ -40,12 +40,8 @@
                              repos?))
         org-repos (not-found->empty (repos/org-repos org-name auth))
         user-repos (not-found->empty (repos/user-repos org-name auth))]
-    (map (fn [{:keys [clone_url
-                      full_name
-                      html_url]}]
-           {::clone-url clone_url
-            ::repo-name full_name
-            ::link html_url})
+    (map (fn [m]
+           (select-keys m [:clone_url :full_name :html_url]))
          (concat org-repos user-repos))))
 
 (s/fdef
@@ -54,10 +50,10 @@
   :ret (s/coll-of ::repo))
 
 (defn- clone-url
-  [token {clone-url ::clone-url}]
+  [token {url :clone_url}]
   ;; https://<token>:x-oauth-basic@github.com/owner/repo.git
   (string/replace
-    clone-url #"//" (str "//" token ":x-oauth-basic@")))
+    url #"//" (str "//" token ":x-oauth-basic@")))
 
 (defn github-clone!
   "Takes a Github Oauth Token, a Repo response map, and returns
@@ -69,10 +65,10 @@
   The value there is a function which can be called to cleanup
   all actions made by this fn."
   [token repo]
-  (log/info "prepping cloning:" (::repo-name repo))
+  (log/info "prepping cloning:" (:full_name repo))
   (fs/delete-recursively tmp-dir)
   (io/make-parents (str tmp-dir ".clj-deps"))
-  (log/info "cloning:" (::repo-name repo))
+  (log/info "cloning:" (:full_name repo))
   (let [result (assoc (sh "git" "clone" (clone-url token repo)
                           :dir tmp-dir)
                  ::dir tmp-dir)]
