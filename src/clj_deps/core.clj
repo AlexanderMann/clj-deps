@@ -34,7 +34,7 @@
   (let [{:keys [desc root nodes]} (lein/graph project-clj)
         new-root {:uid      {:id   [(:html_url repo)]
                              :type :repo}
-                  :children #{(:uid root)}}
+                  :children #{root}}
         repo-graph {:desc  (pr-str {:project-desc desc
                                     :repo         repo})
                     :root  (:uid new-root)
