@@ -9,11 +9,13 @@
     (is (= #{[0 1]
              [1 2]
              [0 3]}
-           (->> [{::lein/depth 0 :id 0}
-                 {::lein/depth 1 :id 1}
-                 {::lein/depth 2 :id 2}
-                 {::lein/depth 1 :id 3}
-                 {::lein/depth 0 :id 4}]
+           ;; note, this format doesn't match the intended spec of uid, but it works
+           ;; currently and makes grokking what's going on here much simpler.
+           (->> [{::lein/depth 0 :uid 0}
+                 {::lein/depth 1 :uid 1}
+                 {::lein/depth 2 :uid 2}
+                 {::lein/depth 1 :uid 3}
+                 {::lein/depth 0 :uid 4}]
                 lein/deps->edges
                 (map (fn [edge] (vec edge)))
                 (into #{}))))))
