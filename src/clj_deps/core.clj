@@ -23,12 +23,6 @@
       (string/replace "/" "__")
       (string/replace "." "_")))
 
-(defn- repo-node
-  [{link :html_url} children]
-  {:uid      {:id   [link]
-              :type :repo}
-   :children (into #{} children)})
-
 (defn- org-node
   [org-name children]
   {:uid      {:id   [org-name]
@@ -38,13 +32,15 @@
 (defn build-repo-graph
   [repo ^File project-clj]
   (let [{:keys [desc root nodes]} (lein/graph project-clj)
+        new-root {:uid      {:id   [(:html_url repo)]
+                             :type :repo}
+                  :children #{(:uid root)}}
         repo-graph {:desc  (pr-str {:project-desc desc
                                     :repo         repo})
-                    :root  (repo-node repo nil)
+                    :root  (:uid new-root)
                     :at    (Date.)
                     :nodes (conj nodes
-                                 (repo-node repo
-                                            #{root}))}]
+                                 new-root)}]
     (when (seq nodes)
       repo-graph)))
 
@@ -61,7 +57,7 @@
        ::github/dir
        lein/project-clj-paths
        (map (fn [project-clj]
-              (if-let [repo-graph (build-repo-graph {} project-clj)]
+              (if-let [repo-graph (build-repo-graph repo project-clj)]
                 (fs/store (format "%s/%s/"
                                   (cleaned-name repo-name)
                                   (cleaned-name (.getParentFile project-clj)))
