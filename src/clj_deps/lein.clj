@@ -5,6 +5,7 @@
             clj-deps.spec
             [clojure.java.io :as io]
             [clojure.java.shell :refer [sh]]
+            [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [clojure.string :as string]
             [clojure.test.check.generators :as gen]
@@ -48,15 +49,15 @@
                  (catch Exception e
                    nil))]))
        (map (fn [[depth [dep-name version _ exclusions]]]
-              {:id       [(str dep-name) (str version)]
+              {:uid      {:id   [(str dep-name) (str version)]
+                          :type :version}
                :children #{}
-               :type     :version
                ::depth   depth}))
-       (filter :id)))
+       (filter :uid)))
 
 (s/def ::depth :clj-deps.spec/non-negative?)
-(s/def ::dep (s/keys :re-un [::graph/id ::graph/children]
-                     :req [::depth]))
+(s/def ::dep (s/merge ::graph/node
+                      (s/keys :req [::depth])))
 (s/def ::deps (s/coll-of ::dep))
 
 (s/fdef
@@ -66,7 +67,7 @@
 
 (defn deps->edges
   "Takes deps and turns them into edges. Returned format is in
-  [clj-deps.graph/id clj-deps.graph/id] format.
+  [clj-deps.graph/uid clj-deps.graph/uid] format.
   Ex:
     deps:
     [[0 k0]
@@ -87,7 +88,7 @@
                                                                 ::depth
                                                                 dec
                                                                 (get lookup))]
-                                         (conj accum (map :id [parent node]))
+                                         (conj accum (map :uid [parent node]))
                                          accum)
                               ::lookup (assoc lookup
                                          (::depth node) node)})
@@ -98,8 +99,8 @@
                 (count edges))
     edges))
 
-(s/def ::edge (s/cat :parent ::graph/id
-                     :child ::graph/id))
+(s/def ::edge (s/cat :parent ::graph/uid
+                     :child ::graph/uid))
 
 (s/fdef
   deps->edges
@@ -112,46 +113,57 @@
                      (dec child-depth)))
                 edges)))
 
-(defn ->id
-  "Given a path to a project-clj, return the clj-deps.graph/id
-  representation of it, or nil if no id can be generated."
+(defn ->version-uid
+  "Given a path to a project-clj, return the clj-deps.graph/uid
+  :version representation of it, or nil if no uid can be generated."
   [project-clj]
   (try
-    [(-> project-clj
-         slurp
-         read-string
-         second
-         str)
-     (github/git-sha project-clj)]
+    {:id   [(-> project-clj
+                slurp
+                read-string
+                second
+                str)
+            (github/git-sha project-clj)]
+     :type :version}
     (catch Exception e
       nil)))
 
 (s/fdef
-  ->id
+  ->version-uid
   :args (s/cat :project-clj ::project-clj)
   :ret (s/or :nil nil?
-             :id (s/and ::graph/id
-                        #(-> % count (= 2)))))
+             :uid (s/and ::graph/uid
+                         #(= :version (:type %)))))
+
+(defn ->project-uid
+  ":projects and :versions share similar uids. This translates a :version uid
+  into its corresponding :project uid"
+  [{[project] :id}]
+  {:id   [project]
+   :type :project})
+
+(s/fdef
+  ->project-uid
+  :args (s/cat :project-clj ::graph/uid)
+  :ret (s/and ::graph/uid
+              #(= :project (:type %))))
 
 (defn- project-nodes
   "Version nodes have an implicit project node in them.
   Returns nodes which represent projects."
   [nodes]
   (let [version-ids (->> nodes
-                         (filter (fn [node]
-                                   (-> node
-                                       :type
-                                       (= :version))))
-                         (map :id))]
-    (reduce (fn [node-map version-id]
+                         (filter (fn [{{node-type :type} :uid}]
+                                   (= :version node-type)))
+                         (map :uid))]
+    (reduce (fn [node-map version-uid]
               (update-in node-map
-                         [[(first version-id)] :children]
-                         conj version-id))
+                         [(->project-uid version-uid) :children]
+                         conj version-uid))
             (->> version-ids
-                 (map (fn [[project]]
-                        {:id       [project]
-                         :children #{}
-                         :type     :project}))
+                 (map (fn [version-id]
+                        {:uid      (->project-uid version-id)
+                         :children #{}}))
                  graph/nodes->map)
             version-ids)))
 
@@ -166,13 +178,12 @@
                     :out
                     deps->nodes
                     (map #(update % ::depth inc))
-                    (cons {:id       (->id project-clj)
+                    (cons {:uid      (->version-uid project-clj)
                            :children #{}
-                           :type     :version
                            ::depth   0})))]
     (graph/merge-nodes
-      (concat (vals (reduce (fn [node-map [parent-id child-id]]
-                              (update-in node-map [parent-id :children] conj child-id))
+      (concat (vals (reduce (fn [node-map [parent-uid child-uid]]
+                              (update-in node-map [parent-uid :children] conj child-uid))
                             (graph/nodes->map deps)
                             (deps->edges deps)))
               (vals (project-nodes deps))))))
@@ -182,23 +193,24 @@
   :args (s/cat :project-clj ::project-clj)
   :ret (s/coll-of ::graph/node)
   :fn (fn [{ret-nodes :ret}]
-        (= (->> ret-nodes
-                (map :id)
-                (into #{}))
-           (->> ret-nodes
-                (map :children)
-                flatten
-                (into #{})))))
+        (set/subset? (->> ret-nodes
+                          (map :uid)
+                          (into #{}))
+                     (->> ret-nodes
+                          (map :children)
+                          flatten
+                          (into #{})))))
 
 (defn graph
   [^File project-clj]
-  {:desc (pr-str {:file-path (.getAbsolutePath project-clj)
-                  :sha (github/git-sha project-clj)})
-   :root {:id (->id project-clj)
-          :type :project
-          :children #{}}
+  {:desc  (pr-str {:file-path (.getAbsolutePath project-clj)
+                   :sha       (github/git-sha project-clj)})
+   :root  {:uid      (-> project-clj
+                         ->version-uid
+                         ->project-uid)
+           :children #{}}
    :nodes (nodes project-clj)
-   :at (Date.)})
+   :at    (Date.)})
 
 (s/fdef
   graph

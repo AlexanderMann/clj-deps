@@ -14,21 +14,27 @@
              :version})
 (s/def ::type (s/with-gen types
                           #(gen/elements types)))
-(s/def ::children (s/coll-of ::id))
-(s/def ::node (s/keys :req-un [::id ::children ::type]))
+(s/def ::uid (s/keys :req-un [::id ::type]))
+(s/def ::children (s/coll-of ::uid))
+(s/def ::node (s/keys :req-un [::uid ::children]))
 (s/def ::nodes (s/coll-of ::node))
 (s/def ::desc string?)
 (s/def ::at inst?)
-(s/def ::root ::node)
+(s/def ::root ::uid)
 (s/def ::graph (s/keys :req-un [::desc ::root ::nodes ::at]))
 
 (defn nodes->map
-  "Take nodes and turn them into a map of :id -> node"
+  "Take nodes and turn them into a map of :uid -> node, merging
+  dupilcates' children along the way"
   [nodes]
-  (->> nodes
-       (map (fn [dep]
-              [(:id dep) dep]))
-       (into {})))
+  (reduce (fn [accum {uid :uid
+                      children :children}]
+            (update-in accum [uid :children] into children))
+          (->> nodes
+               (map (fn [dep]
+                      [(:uid dep) dep]))
+               (into {}))
+          nodes))
 
 (s/fdef
   nodes->map
@@ -36,24 +42,17 @@
   :ret map?
   :fn (fn [{{nodes :nodes} :args
             node-map       :ret}]
-        (and (= (into #{} nodes)
-                (into #{} (vals node-map)))
-             (every? (fn [[k {v :id}]]
+        (and (<= (count (into #{} (vals node-map)))
+                 (count (into #{} nodes)))
+             (every? (fn [[k {v :uid}]]
                        (= k v))
                      node-map))))
 
 (defn merge-nodes
-  "Given a seq of nodes, merge them based on :id and :type."
+  "Given a seq of nodes, merge them based on :uid."
   [nodes]
   (->> nodes
-       (reduce (fn [accum {id :id
-                           node-type :type
-                           children :children}]
-                 (update-in accum [[id node-type] :children] into children))
-               (->> nodes
-                    (map (fn [dep]
-                           [[(:id dep) (:type dep)] dep]))
-                    (into {})))
+       nodes->map
        vals
        (into #{})))
 
@@ -64,8 +63,8 @@
   :fn (fn [{{nodes :nodes} :args
             ret-nodes :ret}]
         (= (->> nodes
-                (map :id)
+                (map :uid)
                 (into #{}))
            (->> ret-nodes
-                (map :id)
+                (map :uid)
                 (into #{})))))

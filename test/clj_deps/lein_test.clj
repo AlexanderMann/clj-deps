@@ -24,11 +24,13 @@
   (testing "simplest and are both a :project, and a :version node"
     (is (= 2
            (->> (lein/nodes (io/file "/code/resources/simplest/project.clj"))
+                (map :uid)
                 (map :id)
                 (filter (fn [[project]] (= "simplest" project)))
                 count)))
     (is (= 2
            (->> (lein/nodes (io/file "/code/resources/simplest/project.clj"))
+                (map :uid)
                 (map :id)
                 (filter (fn [[project]] (= "org.clojure/clojure" project)))
                 count)))))
@@ -36,7 +38,8 @@
 (deftest gen-testing
   (testing "project.clj based fns"
     (is (tu/stest-w-report [`lein/lein-deps
-                            `lein/->id
+                            `lein/->version-uid
+                            `lein/->project-uid
                             `lein/nodes
                             `lein/graph]
                            ; since we have limited project.clj files to work with

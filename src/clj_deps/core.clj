@@ -25,27 +25,27 @@
 
 (defn- repo-node
   [{link ::github/link} children]
-  {:id       [link]
-   :type     :repo
+  {:uid      {:id   [link]
+              :type :repo}
    :children (into #{} children)})
 
 (defn- org-node
   [org-name children]
-  {:id       [org-name]
-   :type     :org
+  {:uid      {:id   [org-name]
+              :type :org}
    :children (into #{} children)})
 
 (defn build-repo-graph
   [repo ^File project-clj]
-  (let [graph (lein/graph project-clj)
-        repo-graph {:desc  (pr-str {:project-desc (:desc graph)
+  (let [{:keys [desc root nodes]} (lein/graph project-clj)
+        repo-graph {:desc  (pr-str {:project-desc desc
                                     :repo         repo})
                     :root  (repo-node repo nil)
                     :at    (Date.)
-                    :nodes (conj (:nodes graph)
+                    :nodes (conj nodes
                                  (repo-node repo
-                                            #{(get-in graph [:root :id])}))}]
-    (when (seq (:nodes graph))
+                                            #{root}))}]
+    (when (seq nodes)
       repo-graph)))
 
 (s/fdef
@@ -74,7 +74,6 @@
   [org-name]
   (log/info "Building org graph...")
   {:desc  (pr-str {:org          org-name
-                   :run-at       (.toGMTString (Date.))
                    :built-from-n (count (fs/clj-deps-paths))})
    :root  (org-node org-name nil)
    :at    (Date.)
