@@ -11,7 +11,8 @@
             [clojure.test.check.generators :as gen]
             [taoensso.timbre :as log])
   (:import [java.io File]
-           [java.util Date]))
+           [java.util Date])
+  (:gen-class))
 
 (defn cleaned-name
   [x]
@@ -112,6 +113,11 @@
                         (into {}))]
      (assoc graph-map
        org-name (build-org-graph! org-name)))))
+
+(defn -main
+  [& args]
+  (log/info "Entered the main route of clj-deps. Using sys env vars to build graphs...")
+  (main))
 
 (comment
   (defn snag

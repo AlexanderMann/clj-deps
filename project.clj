@@ -5,8 +5,14 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
   :min-lein-version "2.0.0"
-  :jvm-opts ["-Xmx2g"]
+  :jvm-opts ["-XX:+PrintGCDetails" "-XX:+Verbose" "-XX:+UnlockExperimentalVMOptions" "-XX:+UseCGroupMemoryLimitForHeap"]
   :monkeypatch-clojure-test false
+
+  :source-paths ["src"]
+  :test-paths ["test"]
+  :resource-paths ["resources"]
+  :target-path "target/"
+  :main clj-deps.core
 
   :dependencies [[com.taoensso/timbre "4.10.0"]
                  [cheshire "5.8.0"]
