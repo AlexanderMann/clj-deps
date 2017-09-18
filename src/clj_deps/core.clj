@@ -103,6 +103,9 @@
    (main (System/getenv "CLJ_DEPS__GH__TOKEN")
          (System/getenv "CLJ_DEPS__GH__ORG")))
   ([token org-name]
+   (when (not (and token org-name))
+     (log/fatal "missing token or org-name, exiting...")
+     (System/exit 27))
    (log/info "Building graphs for:" org-name)
    (let [repos (github/fetch-repos token org-name)
          _ (log/info "Repos to build graphs for:\n" (mapv :full_name repos))
