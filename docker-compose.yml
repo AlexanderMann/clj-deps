@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+    command: NREPL
     environment:
       NREPL_PORT: '3141'
     ports:

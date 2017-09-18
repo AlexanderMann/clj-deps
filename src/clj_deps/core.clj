@@ -11,7 +11,8 @@
             [clojure.test.check.generators :as gen]
             [taoensso.timbre :as log])
   (:import [java.io File]
-           [java.util Date]))
+           [java.util Date])
+  (:gen-class))
 
 (defn cleaned-name
   [x]
@@ -102,6 +103,9 @@
    (main (System/getenv "CLJ_DEPS__GH__TOKEN")
          (System/getenv "CLJ_DEPS__GH__ORG")))
   ([token org-name]
+   (when (not (and token org-name))
+     (log/fatal "missing token or org-name, exiting...")
+     (System/exit 27))
    (log/info "Building graphs for:" org-name)
    (let [repos (github/fetch-repos token org-name)
          _ (log/info "Repos to build graphs for:\n" (mapv :full_name repos))
@@ -112,6 +116,11 @@
                         (into {}))]
      (assoc graph-map
        org-name (build-org-graph! org-name)))))
+
+(defn -main
+  [& args]
+  (log/info "Entered the main route of clj-deps. Using sys env vars to build graphs...")
+  (main))
 
 (comment
   (defn snag

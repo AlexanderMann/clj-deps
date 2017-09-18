@@ -8,6 +8,13 @@ workflows:
       - test:
           requires:
             - build_cache
+      - publish:
+          context: org-global
+          requires:
+            - test
+          filters:
+            branches:
+              only: master
 
 jobs:
   build_cache:
@@ -31,9 +38,13 @@ jobs:
 
   test:
     docker:
-      - image: clojure:latest
+      - image: clojure:lein-2.7.1-alpine
     working_directory: /code/
     steps:
+      - run:
+          name: Install Git
+          command: apk update && apk upgrade && apk add --no-cache bash git openssh
+
       - checkout
       - restore_cache:
           keys:
@@ -56,3 +67,23 @@ jobs:
       - store_artifacts:
           path: storage
           destination: clj-deps-output
+
+  publish:
+    docker:
+      - image: stongo/command-convenience:0.2.0
+        environment:
+          CONTAINER_ORG: mannimal
+          NAME: clj-deps
+          DOCKERFILE_PATH: Dockerfile
+          DOCKER_REGISTRY: dockerhub
+    working_directory: /code/
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - deps-v0.0.0-{{ checksum "project.clj" }}
+
+      - setup_remote_docker
+
+      - run:
+          command: publish
