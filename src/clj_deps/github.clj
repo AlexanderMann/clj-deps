@@ -1,4 +1,5 @@
 (ns clj-deps.github
+  "This ns deals with all interactions with Github."
   (:require [clj-deps.filesystem :as fs]
             clj-deps.spec
             [clojure.java.io :as io]
@@ -82,6 +83,9 @@
                 (s/keys :req [::dir])))
 
 (defn git-sha
+  "Given a File which is the root where we want to get a current git sha,
+  return the Hex char set sha associated if possible. Returns nil on
+  failure to find a sha."
   [^File root]
   (let [{:keys [exit out]} (sh "git" "rev-parse" "HEAD"
                                :dir (if (.isDirectory root)

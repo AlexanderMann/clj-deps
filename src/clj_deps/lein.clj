@@ -1,4 +1,8 @@
 (ns clj-deps.lein
+  "An ns intended to deal with interactions with `lein`.
+
+  Deals with running `lein` to get a dep tree, parsing the tree,
+  turning the parsed representation into a clj-deps.graph."
   (:require [clj-deps.filesystem :as fs]
             [clj-deps.github :as github]
             [clj-deps.graph :as graph]
@@ -14,6 +18,7 @@
            [java.util Date]))
 
 (defn project-clj-paths
+  "Return all `project.clj` Files underneath root."
   [root]
   (fs/find-paths root "project.clj"))
 
@@ -23,6 +28,7 @@
                                      (project-clj-paths "/code/")))))
 
 (defn lein-deps
+  "Run the `lein deps :tree` file on the passed in `project.clj`."
   [^File project-clj]
   (log/info "fetching lein deps for: " (.getAbsolutePath project-clj))
   (sh "lein" "deps" ":tree"
@@ -202,6 +208,7 @@
                           (into #{})))))
 
 (defn graph
+  "Build a clj-deps.graph representing the passed in `project.clj`"
   [^File project-clj]
   {:desc  (pr-str {:file-path (.getAbsolutePath project-clj)
                    :sha       (github/git-sha project-clj)})
