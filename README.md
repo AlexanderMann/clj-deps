@@ -62,11 +62,14 @@ jobs:
   clj-deps:
     docker:
       - image: mannimal/clj-deps:latest
-        environment:
-          CLJ_DEPS__GH__ORG: AlexanderMann
-          # CLJ_DEPS__GH__TOKEN: <present in project env vars/org-global context>
     working_directory: /code/
     steps:
+      - run:
+          name: Run CLJ-Deps
+          command: /code/run
+          environment:
+            CLJ_DEPS__GH__ORG: AlexanderMann
+            # CLJ_DEPS__GH__TOKEN: <present in project env vars/org-global context>
       - store_artifacts:
           path: storage
           destination: clj-deps-output
