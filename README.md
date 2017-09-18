@@ -73,7 +73,7 @@ jobs:
 ```
 
 After you get the output in your build, artifacts you can take a `clj-deps.json` file link and paste it in [here](https://annguy3n.github.io/cinnamon/) to get an awesome graph such as the following:
-
+   
 
 
 ### How to get a proper GitHub Token
