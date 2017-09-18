@@ -5,7 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
   :min-lein-version "2.0.0"
-  :jvm-opts ["-XX:+PrintGCDetails" "-XX:+UnlockExperimentalVMOptions" "-XX:+UseCGroupMemoryLimitForHeap"]
+  :jvm-opts [ "-Xms2g" "-XX:+PrintGCDetails" "-XX:+UnlockExperimentalVMOptions" "-XX:+UseCGroupMemoryLimitForHeap"]
   :monkeypatch-clojure-test false
 
   :source-paths ["src"]
