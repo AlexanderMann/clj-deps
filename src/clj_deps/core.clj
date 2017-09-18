@@ -79,10 +79,12 @@
                (reduce (fn [accum-nodes
                             {nodes :nodes
                              root  :root}]
-                         (graph/merge-nodes
-                           (concat accum-nodes
-                                   nodes
-                                   #{(org-node org-name #{root})})))
+                         (if (-> root :type (= :repo))
+                           (graph/merge-nodes
+                             (concat accum-nodes
+                                     nodes
+                                     #{(org-node org-name #{root})}))
+                           accum-nodes))
                        #{}))})
 
 (s/fdef
