@@ -67,4 +67,4 @@
 (s/fdef
   clj-deps-paths
   :args (s/cat)
-  :ret (partial instance? File))
+  :ret (s/coll-of (partial instance? File)))
