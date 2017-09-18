@@ -1,4 +1,8 @@
 (ns clj-deps.filesystem
+  "Helper ns for interacting with the Filesystem.
+
+  You'll find a good number of 'hacks' for interacting with the Filesystem
+  herein. Tough love."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.java.shell :refer [sh]]
@@ -10,6 +14,9 @@
 (def storage-dir "/code/storage/")
 
 (defn delete-recursively
+  "WARN: This runs `rm -rf` on the fs. This is done so that deleting symlinks and whatnot
+  is simple. `git clone` allows for a lot of difficult to handle edge cases for basic java
+  file traversal/deletion..."
   [path]
   (log/warn "deleting:" path)
   (let [f (io/file path)]
@@ -53,5 +60,11 @@
     paths))
 
 (defn clj-deps-paths
+  "Find all clj-deps.edn files available in the storage-dir"
   []
   (find-paths storage-dir (str clj-deps-fname ".edn")))
+
+(s/fdef
+  clj-deps-paths
+  :args (s/cat)
+  :ret (partial instance? File))

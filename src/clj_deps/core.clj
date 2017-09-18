@@ -1,4 +1,5 @@
 (ns clj-deps.core
+  "Main ns for CLJ-Deps. Use this to build general graphs."
   (:require [cheshire.core :as json]
             [clj-deps.filesystem :as fs]
             [clj-deps.github :as github]
@@ -31,6 +32,7 @@
    :children (into #{} children)})
 
 (defn build-repo-graph
+  "Given a `repo` and a project clj, build a solitary `repo` -> `project` graph"
   [repo ^File project-clj]
   (let [{:keys [desc root nodes]} (lein/graph project-clj)
         new-root {:uid      {:id   [(:html_url repo)]
@@ -52,6 +54,8 @@
              :graph ::graph/graph))
 
 (defn build-repo-graphs!
+  "Like build-repo-graph, except builds all `repo` -> `project` graphs,
+  and stores them."
   [token {repo-name :full_name :as repo}]
   (log/info "building graphs for: " repo-name)
   (->> (github/github-clone! token repo)
@@ -68,6 +72,9 @@
        doall))
 
 (defn build-org-graph
+  "Assuming that the fs has been setup with all association `repo` graphs,
+  builds a global `org` graph which is the result of merging all `repo` graphs
+  underneath an `org` node."
   [org-name]
   (log/info "Building org graph...")
   {:desc  (pr-str {:org          org-name
@@ -94,6 +101,7 @@
   :ret ::graph/graph)
 
 (defn build-org-graph!
+  "Like build-org-graph except store it."
   [org-name]
   (fs/store "" (build-org-graph org-name)))
 
@@ -118,12 +126,14 @@
        org-name (build-org-graph! org-name)))))
 
 (defn -main
+  "Main entrypoint, just like main"
   [& args]
   (log/info "Entered the main route of clj-deps. Using sys env vars to build graphs...")
   (main))
 
 (comment
   (defn snag
+    "Simple arg def snagger for debugging."
     [arg]
     (def snagged arg)
     arg)

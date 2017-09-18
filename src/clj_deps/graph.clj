@@ -1,4 +1,5 @@
 (ns clj-deps.graph
+  "A detailed ns meant to document the clj-deps graph data structure format."
   (:require [clojure.spec.alpha :as s]
             [clojure.test.check.generators :as gen]))
 
