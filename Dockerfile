@@ -6,4 +6,4 @@ RUN apk update && apk upgrade && \
 ADD . /code
 WORKDIR /code
 
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["./run"]
